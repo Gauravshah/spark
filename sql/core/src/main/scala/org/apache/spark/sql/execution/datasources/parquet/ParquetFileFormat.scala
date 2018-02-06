@@ -54,6 +54,7 @@ import org.apache.spark.util.{SerializableConfiguration, ThreadUtils}
 
 class ParquetFileFormat
   extends FileFormat
+  with ColumnarFileFormat
   with DataSourceRegister
   with Logging
   with Serializable {
@@ -70,6 +71,13 @@ class ParquetFileFormat
   override def hashCode(): Int = getClass.hashCode()
 
   override def equals(other: Any): Boolean = other.isInstanceOf[ParquetFileFormat]
+
+  override def columnCountForSchema(sparkSession: SparkSession, readSchema: StructType): Int = {
+    val converter = new ParquetSchemaConverter(
+      sparkSession.sessionState.conf.writeLegacyParquetFormat)
+    val parquetSchema = converter.convert(readSchema)
+    parquetSchema.getPaths.size
+  }
 
   override def prepareWrite(
       sparkSession: SparkSession,
@@ -370,13 +378,14 @@ class ParquetFileFormat
       } else {
         logDebug(s"Falling back to parquet-mr")
         // ParquetRecordReader returns UnsafeRow
+        val readSupport = new ParquetReadSupport(true)
         val reader = pushed match {
           case Some(filter) =>
             new ParquetRecordReader[UnsafeRow](
-              new ParquetReadSupport,
+              readSupport,
               FilterCompat.get(filter, null))
           case _ =>
-            new ParquetRecordReader[UnsafeRow](new ParquetReadSupport)
+            new ParquetRecordReader[UnsafeRow](readSupport)
         }
         reader.initialize(split, hadoopAttemptContext)
         reader

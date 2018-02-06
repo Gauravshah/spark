@@ -127,6 +127,9 @@ abstract class Optimizer(sessionCatalog: SessionCatalog, conf: SQLConf)
       PropagateEmptyRelation) ::
     Batch("OptimizeCodegen", Once,
       OptimizeCodegen(conf)) ::
+    Batch("Field Extraction Pushdown", fixedPoint,
+      AggregateFieldExtractionPushdown(conf),
+      JoinFieldExtractionPushdown(conf)) ::
     Batch("RewriteSubquery", Once,
       RewritePredicateSubquery,
       CollapseProject) :: Nil
